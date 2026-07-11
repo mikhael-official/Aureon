@@ -22,10 +22,16 @@ jobs:
         distribution: temurin
         java-version: 17
 
-    - name: Build APK (using system Gradle)
+    # Este passo é essencial para resolver o erro do Kotlin/Native que apareceu na sua imagem
+    - name: Install Kotlin Native dependencies
+      run: sudo apt-get update && sudo apt-get install -y libncurses5 libtinfo5
+
+    - name: Build APK
       run: |
         cd Aureon
-        gradle :composeApp:assembleRelease
+        # Use ./gradlew em vez de apenas 'gradle' para garantir que 
+        # a versão do Gradle do seu projeto seja respeitada
+        ./gradlew assembleRelease
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
