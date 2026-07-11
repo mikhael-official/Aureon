@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# Cria todas as pastas necessárias
 mkdir -p Aureon/gradle
 mkdir -p Aureon/composeApp/src/commonMain/kotlin/com/aureon/core/i18n
 mkdir -p Aureon/composeApp/src/commonMain/kotlin/com/aureon/core/benchmark
@@ -100,7 +102,7 @@ kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", versio
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 EOF
 
-# composeApp/build.gradle.kts
+# composeApp/build.gradle.kts (CORRIGIDO)
 cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -111,39 +113,53 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
+val isIosBuild = System.getProperty("os.name")?.startsWith("Mac") ?: false
+
 kotlin {
     androidTarget {
         compilations.all { kotlinOptions.jvmTarget = "17" }
     }
-    listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach {
-        it.binaries.framework { baseName = "ComposeApp"; isStatic = true }
+
+    if (isIosBuild) {
+        listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach {
+            it.binaries.framework { baseName = "ComposeApp"; isStatic = true }
+        }
     }
+
     sourceSets {
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.sqldelight.runtime)
-            implementation(libs.sqldelight.coroutines)
-            implementation(libs.koin.core)
-            implementation(libs.koin.compose)
+        val commonMain by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.sqldelight.runtime)
+                implementation(libs.sqldelight.coroutines)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+            }
         }
-        androidMain.dependencies {
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.ktor.client.okhttp)
-            implementation(libs.sqldelight.android.driver)
-            implementation(libs.nanohttpd)
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.sqldelight.android.driver)
+                implementation(libs.nanohttpd)
+            }
         }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
-            implementation(libs.sqldelight.native.driver)
+        if (isIosBuild) {
+            val iosMain by getting {
+                dependencies {
+                    implementation(libs.ktor.client.darwin)
+                    implementation(libs.sqldelight.native.driver)
+                }
+            }
         }
     }
 }
@@ -336,7 +352,7 @@ actual fun createSqlDriver(): SqlDriver {
 }
 EOF
 
-# Platform.ios.kt
+# Platform.ios.kt (mantido, mas não será compilado no Linux)
 cat > Aureon/composeApp/src/iosMain/kotlin/com/aureon/platform/Platform.ios.kt << 'EOF'
 package com.aureon.platform
 
@@ -965,7 +981,7 @@ cat > Aureon/composeApp/src/androidMain/res/values/themes.xml << 'EOF'
 </resources>
 EOF
 
-# Gradle wrapper
+# Gradle wrapper properties (opcional, mas o workflow usa `gradle` do sistema)
 mkdir -p Aureon/gradle/wrapper
 cat > Aureon/gradle/wrapper/gradle-wrapper.properties << 'EOF'
 distributionBase=GRADLE_USER_HOME
@@ -977,36 +993,4 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-# wrapper jar? Not needed for Actions, but we need gradlew script
-cat > Aureon/gradlew << 'EOF'
-#!/bin/sh
-##############################################################################
-## Gradle start up script for UN*X
-##############################################################################
-# Attempt to set APP_HOME
-PRG="$0"
-while [ -h "$PRG" ] ; do
-    ls=`ls -ld "$PRG"`
-    link=`expr "$ls" : '.*-> \(.*\)$'`
-    if expr "$link" : '/.*' > /dev/null; then
-        PRG="$link"
-    else
-        PRG=`dirname "$PRG"`"/$link"
-    fi
-done
-SAVED="`pwd`"
-cd "`dirname \"$PRG\"`/" >/dev/null
-APP_HOME="`pwd -P`"
-cd "$SAVED" >/dev/null
-
-APP_NAME="Gradle"
-APP_BASE_NAME=`basename "$0"`
-
-# Add default JVM options here.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
-
-exec java $DEFAULT_JVM_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
-EOF
-chmod +x Aureon/gradlew
+echo "Projeto Aureon gerado com sucesso."
