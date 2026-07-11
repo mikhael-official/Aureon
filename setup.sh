@@ -994,4 +994,52 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-echo "Projeto Aureon gerado com sucesso com blindagem total para CI/Linux."
+# -----------------------------------------------------------------------------
+# ADICIONADO: GERAÇÃO AUTOMÁTICA DO GITHUB ACTIONS WORKFLOW NA RAIZ DO PROJETO
+# -----------------------------------------------------------------------------
+mkdir -p .github/workflows
+cat > .github/workflows/build.yml << 'EOF'
+name: Build Aureon APK
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Aureon # 👈 Garante que os comandos rodem na pasta gerada
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+          
+      - name: Install Kotlin Native dependencies
+        # 👈 ESSA É A CORREÇÃO DE OURO PARA O ERRO KonanTarget$IOS_ARM32
+        run: sudo apt-get update && sudo apt-get install -y libncurses5 libtinfo5
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build APK (Android)
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aureon-App-Debug
+          path: Aureon/composeApp/build/outputs/apk/debug/composeApp-debug.apk
+EOF
+
+echo "Projeto Aureon gerado com sucesso com blindagem total para CI/Linux e Workflow do GitHub Actions incluso."
