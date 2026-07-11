@@ -53,12 +53,14 @@ rootProject.name = "Aureon"
 include(":composeApp")
 EOF
 
-# gradle.properties
+# gradle.properties (CORRIGIDO: BLINDADO PARA LINUX/CI)
 cat > Aureon/gradle.properties << 'EOF'
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
 kotlin.code.style=official
 android.nonTransitiveRClass=true
+kotlin.mpp.enableCInteropCommonization=true
+kotlin.native.ignoreDisabledTargets=true
 EOF
 
 # libs.versions.toml
@@ -102,7 +104,7 @@ kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", versio
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 EOF
 
-# composeApp/build.gradle.kts (CORRIGIDO)
+# composeApp/build.gradle.kts (CORRIGIDO: PRECISÃO MÁXIMA NA CHECAGEM DE OS)
 cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -113,47 +115,46 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
-val isIosBuild = System.getProperty("os.name")?.startsWith("Mac") ?: false
+val hostOs = System.getProperty("os.name") ?: ""
+val isMac = hostOs.startsWith("Mac")
 
 kotlin {
     androidTarget {
         compilations.all { kotlinOptions.jvmTarget = "17" }
     }
 
-    if (isIosBuild) {
+    if (isMac) {
         listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach {
             it.binaries.framework { baseName = "ComposeApp"; isStatic = true }
         }
     }
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
-                implementation(compose.components.resources)
-                implementation(libs.ktor.client.core)
-                implementation(libs.ktor.client.content.negotiation)
-                implementation(libs.ktor.serialization.kotlinx.json)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
-                implementation(libs.sqldelight.runtime)
-                implementation(libs.sqldelight.coroutines)
-                implementation(libs.koin.core)
-                implementation(libs.koin.compose)
-            }
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
         }
-        val androidMain by getting {
-            dependencies {
-                implementation(libs.androidx.activity.compose)
-                implementation(libs.ktor.client.okhttp)
-                implementation(libs.sqldelight.android.driver)
-                implementation(libs.nanohttpd)
-            }
+        
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.sqldelight.android.driver)
+            implementation(libs.nanohttpd)
         }
-        if (isIosBuild) {
+        
+        if (isMac) {
             val iosMain by getting {
                 dependencies {
                     implementation(libs.ktor.client.darwin)
@@ -981,7 +982,7 @@ cat > Aureon/composeApp/src/androidMain/res/values/themes.xml << 'EOF'
 </resources>
 EOF
 
-# Gradle wrapper properties (opcional, mas o workflow usa `gradle` do sistema)
+# Gradle wrapper properties
 mkdir -p Aureon/gradle/wrapper
 cat > Aureon/gradle/wrapper/gradle-wrapper.properties << 'EOF'
 distributionBase=GRADLE_USER_HOME
@@ -993,4 +994,4 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-echo "Projeto Aureon gerado com sucesso."
+echo "Projeto Aureon gerado com sucesso com blindagem total para CI/Linux."
