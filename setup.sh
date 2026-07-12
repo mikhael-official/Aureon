@@ -58,7 +58,7 @@ cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")   // compose compiler plugin, não carrega KMP
+    id("org.jetbrains.kotlin.plugin.compose")
     id("app.cash.sqldelight")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -104,8 +104,8 @@ dependencies {
     implementation("app.cash.sqldelight:runtime:2.0.1")
     implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
     implementation("app.cash.sqldelight:android-driver:2.0.1")
-    implementation("io.insert-koin:koin-core:3.5.3")
-    implementation("io.insert-koin:koin-compose:3.5.3")
+    implementation("io.insert-koin:koin-android:3.5.3")
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 }
 
@@ -117,9 +117,6 @@ sqldelight {
     }
 }
 EOF
-
-# ... (todos os demais arquivos Kotlin permanecem exatamente iguais aos do script anterior)
-# Apenas copie o restante do script que gera os fontes (já fornecidos nas respostas anteriores).
 
 # App.kt
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/App.kt << 'EOF'
@@ -360,7 +357,7 @@ class ChatUseCase(
 }
 EOF
 
-# ChatScreen.kt
+# ChatScreen.kt (IMPORT CORRIGIDO)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/ChatScreen.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation
 
@@ -373,7 +370,7 @@ import androidx.compose.ui.Modifier
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.nexusai.presentation.components.ChatInput
 import com.aureon.feature.nexusai.presentation.components.MessageBubble
-import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinInject
 
 @Composable
 fun ChatScreen(strings: Strings, viewModel: ChatViewModel = koinInject()) {
@@ -494,7 +491,7 @@ val nexusAiModule = module {
 }
 EOF
 
-# DashboardScreen.kt
+# DashboardScreen.kt (IMPORT CORRIGIDO)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/dashboard/DashboardScreen.kt << 'EOF'
 package com.aureon.feature.dashboard
 
@@ -506,7 +503,7 @@ import androidx.compose.ui.unit.dp
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.dashboard.widgets.SystemStatusWidget
 import com.aureon.feature.dashboard.widgets.WidgetGrid
-import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinInject
 
 @Composable
 fun DashboardScreen(strings: Strings, viewModel: DashboardViewModel = koinInject()) {
@@ -664,7 +661,7 @@ class ProjectManager {
 }
 EOF
 
-# CodeEditorScreen.kt
+# CodeEditorScreen.kt (IMPORT CORRIGIDO)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentation/CodeEditorScreen.kt << 'EOF'
 package com.aureon.feature.webforge.presentation
 
@@ -673,7 +670,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.aureon.feature.webforge.presentation.components.CodeEditorField
-import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinInject
 
 @Composable
 fun CodeEditorScreen(viewModel: CodeEditorViewModel = koinInject()) {
