@@ -9,12 +9,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
 
     - name: Generate project files
       run: chmod +x setup.sh && ./setup.sh
+
+    - name: Debug - List files
+      run: ls -la Aureon/
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -27,13 +29,13 @@ jobs:
       with:
         gradle-version: 8.4
 
-    - name: Build APK
+    - name: Build Debug APK
       run: |
         cd Aureon
-        gradle :composeApp:assembleRelease
+        gradle :composeApp:assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Aureon-APK
-        path: Aureon/composeApp/build/outputs/apk/release/*.apk
+        path: Aureon/composeApp/build/outputs/apk/debug/*.apk
