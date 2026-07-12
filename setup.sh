@@ -17,7 +17,7 @@ mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentat
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/di
 mkdir -p Aureon/composeApp/src/main/res/values
 
-# Root build.gradle.kts – SEM org.jetbrains.compose
+# Root build.gradle.kts
 cat > Aureon/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application") version "8.2.2" apply false
@@ -53,7 +53,7 @@ kotlin.code.style=official
 android.nonTransitiveRClass=true
 EOF
 
-# composeApp/build.gradle.kts – APENAS ANDROID, SEM KMP, SEM ORG.JETBRAINS.COMPOSE
+# composeApp/build.gradle.kts
 cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application")
@@ -118,10 +118,15 @@ sqldelight {
 }
 EOF
 
-# App.kt
+# App.kt (imports corrigidos)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/App.kt << 'EOF'
 package com.aureon
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.dashboard.DashboardScreen
@@ -202,6 +207,7 @@ EOF
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/core/util/Markdown.kt << 'EOF'
 package com.aureon.core.util
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -230,7 +236,7 @@ fun String.markdownToAnnotatedString(): AnnotatedString = buildAnnotatedString {
             remaining.startsWith("`") -> {
                 val end = remaining.indexOf("`", 1)
                 if (end != -1) {
-                    withStyle(SpanStyle(background = androidx.compose.ui.graphics.Color.LightGray)) { append(remaining.substring(1, end)) }
+                    withStyle(SpanStyle(background = Color.LightGray)) { append(remaining.substring(1, end)) }
                     remaining = remaining.substring(end + 1)
                 } else { append(remaining.first()); remaining = remaining.drop(1) }
             }
@@ -241,16 +247,15 @@ fun String.markdownToAnnotatedString(): AnnotatedString = buildAnnotatedString {
 }
 EOF
 
-# Platform.android.kt
+# Platform.kt (corrigido import do banco)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/platform/Platform.kt << 'EOF'
 package com.aureon.platform
 
-import android.content.Context
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.aureon.AureonDatabase
 import com.aureon.AureonApp
 import com.aureon.core.i18n.Strings
+import com.aureon.feature.nexusai.data.AureonDatabase
 import java.util.Locale
 
 fun getPlatformName() = "Android ${android.os.Build.VERSION.SDK_INT}"
@@ -287,11 +292,10 @@ deleteAll:
 DELETE FROM ChatMessageEntity;
 EOF
 
-# ChatRepository.kt
+# ChatRepository.kt (corrigido import, timestamp com System.currentTimeMillis)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/data/ChatRepository.kt << 'EOF'
 package com.aureon.feature.nexusai.data
 
-import com.aureon.AureonDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -306,7 +310,7 @@ class ChatRepository(private val database: AureonDatabase) {
         }
 
     suspend fun insertMessage(role: String, content: String) {
-        queries.insertMessage(role, content, kotlinx.datetime.Clock.System.now().toEpochMilliseconds())
+        queries.insertMessage(role, content, System.currentTimeMillis())
     }
 
     suspend fun clearHistory() { queries.deleteAll() }
@@ -357,21 +361,30 @@ class ChatUseCase(
 }
 EOF
 
-# ChatScreen.kt (IMPORT CORRIGIDO)
+# ChatScreen.kt (imports + @OptIn)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/ChatScreen.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.nexusai.presentation.components.ChatInput
 import com.aureon.feature.nexusai.presentation.components.MessageBubble
 import org.koin.androidx.compose.koinInject
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(strings: Strings, viewModel: ChatViewModel = koinInject()) {
     val messages by viewModel.messages.collectAsState()
@@ -414,13 +427,18 @@ class ChatViewModel(private val chatUseCase: ChatUseCase) {
 }
 EOF
 
-# MessageBubble.kt
+# MessageBubble.kt (import Alignment)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/components/MessageBubble.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation.components
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aureon.core.util.markdownToAnnotatedString
@@ -448,9 +466,19 @@ EOF
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/components/ChatInput.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation.components
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aureon.core.i18n.Strings
@@ -491,20 +519,25 @@ val nexusAiModule = module {
 }
 EOF
 
-# DashboardScreen.kt (IMPORT CORRIGIDO)
+# DashboardScreen.kt (imports + @OptIn)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/dashboard/DashboardScreen.kt << 'EOF'
 package com.aureon.feature.dashboard
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.dashboard.widgets.SystemStatusWidget
 import com.aureon.feature.dashboard.widgets.WidgetGrid
 import org.koin.androidx.compose.koinInject
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(strings: Strings, viewModel: DashboardViewModel = koinInject()) {
     val widgets by viewModel.widgets.collectAsState()
@@ -544,15 +577,28 @@ class DashboardViewModel {
 }
 EOF
 
-# WidgetGrid.kt
+# WidgetGrid.kt (corrigido onDrag)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/dashboard/widgets/WidgetGrid.kt << 'EOF'
 package com.aureon.feature.dashboard.widgets
 
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -576,6 +622,7 @@ fun WidgetGrid(
             Card(
                 modifier = Modifier.padding(4.dp).pointerInput(Unit) {
                     detectDragGestures(
+                        onDrag = { _, _ -> },
                         onDragEnd = {
                             val mutable = items.toMutableList()
                             if (index < mutable.lastIndex) {
@@ -617,7 +664,7 @@ fun SystemStatusWidget() {
 }
 EOF
 
-# LocalServer.kt
+# LocalServer.kt (usando newFixedLengthResponse)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/data/LocalServer.kt << 'EOF'
 package com.aureon.feature.webforge.data
 
@@ -640,8 +687,10 @@ class LocalServer(private val port: Int = 8080) {
                         uri.endsWith(".js") -> "application/javascript"
                         else -> "application/octet-stream"
                     }
-                    Response(Response.Status.OK, mime, FileInputStream(file))
-                } else Response(Response.Status.NOT_FOUND, "text/plain", "Not Found")
+                    newFixedLengthResponse(Response.Status.OK, mime, FileInputStream(file), file.length())
+                } else {
+                    newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not Found")
+                }
             }
         }
         server?.start()
@@ -661,28 +710,38 @@ class ProjectManager {
 }
 EOF
 
-# CodeEditorScreen.kt (IMPORT CORRIGIDO)
+# CodeEditorScreen.kt (corrigido StateFlow + @OptIn)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentation/CodeEditorScreen.kt << 'EOF'
 package com.aureon.feature.webforge.presentation
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.aureon.feature.webforge.presentation.components.CodeEditorField
 import org.koin.androidx.compose.koinInject
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CodeEditorScreen(viewModel: CodeEditorViewModel = koinInject()) {
+    val code by viewModel.code.collectAsState()
+    val isServerRunning by viewModel.isServerRunning.collectAsState()
     Scaffold(
         topBar = { TopAppBar(title = { Text("WebForge") }) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             Button(onClick = { viewModel.toggleServer() }) {
-                Text(if (viewModel.isServerRunning) "Stop Server" else "Start Server")
+                Text(if (isServerRunning) "Stop Server" else "Start Server")
             }
             CodeEditorField(
-                code = viewModel.code,
+                code = code,
                 onCodeChange = { viewModel.updateCode(it) },
                 language = "html"
             )
@@ -721,13 +780,19 @@ cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentation
 package com.aureon.feature.webforge.presentation.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -738,7 +803,7 @@ fun CodeEditorField(code: String, onCodeChange: (String) -> Unit, language: Stri
     BasicTextField(
         value = textFieldValue,
         onValueChange = { textFieldValue = it; onCodeChange(it.text) },
-        textStyle = TextStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 14.sp, color = Color.White),
+        textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, color = Color.White),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 300.dp)
@@ -866,7 +931,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-# Workflow atualizado
+# Workflow
 mkdir -p .github/workflows
 cat > .github/workflows/build.yml << 'EOF'
 name: Build Aureon APK
@@ -904,4 +969,4 @@ jobs:
         path: Aureon/composeApp/build/outputs/apk/release/*.apk
 EOF
 
-echo "Projeto Aureon (Android puro, sem KMP) gerado com sucesso."
+echo "Projeto Aureon (Android puro) gerado com sucesso e corrigido."
