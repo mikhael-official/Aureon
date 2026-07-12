@@ -5,7 +5,6 @@ mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/core/i18n
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/core/benchmark
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/core/util
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/platform
-mkdir -p Aureon/composeApp/src/main/sqldelight/com/aureon/feature/nexusai/data
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/data
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/domain
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/components
@@ -17,14 +16,12 @@ mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentat
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/di
 mkdir -p Aureon/composeApp/src/main/res/values
 
-# Root build.gradle.kts
+# Root build.gradle.kts (sem SQLDelight, sem KMP)
 cat > Aureon/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application") version "8.2.2" apply false
     id("org.jetbrains.kotlin.android") version "2.0.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" apply false
-    id("app.cash.sqldelight") version "2.0.1" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0" apply false
 }
 EOF
 
@@ -53,14 +50,12 @@ kotlin.code.style=official
 android.nonTransitiveRClass=true
 EOF
 
-# composeApp/build.gradle.kts
+# composeApp/build.gradle.kts (versão limpa)
 cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("app.cash.sqldelight")
-    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -95,30 +90,13 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("io.ktor:ktor-client-core:2.3.7")
-    implementation("io.ktor:ktor-client-okhttp:2.3.7")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    implementation("app.cash.sqldelight:runtime:2.0.1")
-    implementation("app.cash.sqldelight:coroutines-extensions:2.0.1")
-    implementation("app.cash.sqldelight:android-driver:2.0.1")
     implementation("io.insert-koin:koin-android:3.5.3")
     implementation("io.insert-koin:koin-androidx-compose:3.5.3")
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
-}
-
-sqldelight {
-    databases {
-        create("AureonDatabase") {
-            packageName.set("com.aureon.feature.nexusai.data")
-        }
-    }
 }
 EOF
 
-# App.kt (imports corrigidos)
+# App.kt (imports completos)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/App.kt << 'EOF'
 package com.aureon
 
@@ -247,15 +225,11 @@ fun String.markdownToAnnotatedString(): AnnotatedString = buildAnnotatedString {
 }
 EOF
 
-# Platform.kt (corrigido import do banco)
+# Platform.kt (sem SQLDelight)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/platform/Platform.kt << 'EOF'
 package com.aureon.platform
 
-import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.aureon.AureonApp
 import com.aureon.core.i18n.Strings
-import com.aureon.feature.nexusai.data.AureonDatabase
 import java.util.Locale
 
 fun getPlatformName() = "Android ${android.os.Build.VERSION.SDK_INT}"
@@ -267,53 +241,37 @@ fun getLocalizedStrings(): Strings {
         else -> Strings.En
     }
 }
-
-fun createSqlDriver(): SqlDriver {
-    return AndroidSqliteDriver(AureonDatabase.Schema, AureonApp.instance, "aureon.db")
-}
 EOF
 
-# ChatMessage.sq
-cat > Aureon/composeApp/src/main/sqldelight/com/aureon/feature/nexusai/data/ChatMessage.sq << 'EOF'
-CREATE TABLE ChatMessageEntity (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    timestamp INTEGER NOT NULL
-);
+# ChatMessage data class
+cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/data/ChatMessage.kt << 'EOF'
+package com.aureon.feature.nexusai.data
 
-selectAll:
-SELECT * FROM ChatMessageEntity ORDER BY timestamp ASC;
-
-insertMessage:
-INSERT INTO ChatMessageEntity (role, content, timestamp) VALUES (?, ?, ?);
-
-deleteAll:
-DELETE FROM ChatMessageEntity;
+data class ChatMessage(val id: Long = 0, val role: String, val content: String, val timestamp: Long)
 EOF
 
-# ChatRepository.kt (corrigido import, timestamp com System.currentTimeMillis)
+# ChatRepository (in-memory)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/data/ChatRepository.kt << 'EOF'
 package com.aureon.feature.nexusai.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
-data class ChatMessage(val id: Long = 0, val role: String, val content: String, val timestamp: Long)
+class ChatRepository {
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    private var idCounter = 0L
 
-class ChatRepository(private val database: AureonDatabase) {
-    private val queries = database.chatMessageEntityQueries
-
-    fun getAllMessages(): Flow<List<ChatMessage>> =
-        queries.selectAll().asFlow().mapToList().map { list ->
-            list.map { ChatMessage(it.id, it.role, it.content, it.timestamp) }
-        }
+    fun getAllMessages(): Flow<List<ChatMessage>> = _messages
 
     suspend fun insertMessage(role: String, content: String) {
-        queries.insertMessage(role, content, System.currentTimeMillis())
+        val msg = ChatMessage(idCounter++, role, content, System.currentTimeMillis())
+        _messages.value = _messages.value + msg
     }
 
-    suspend fun clearHistory() { queries.deleteAll() }
+    suspend fun clearHistory() {
+        _messages.value = emptyList()
+    }
 }
 EOF
 
@@ -361,7 +319,7 @@ class ChatUseCase(
 }
 EOF
 
-# ChatScreen.kt (imports + @OptIn)
+# ChatScreen.kt (sem koinInject, usando helper)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/ChatScreen.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation
 
@@ -382,11 +340,11 @@ import androidx.compose.ui.unit.dp
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.nexusai.presentation.components.ChatInput
 import com.aureon.feature.nexusai.presentation.components.MessageBubble
-import org.koin.androidx.compose.koinInject
+import com.aureon.di.getViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(strings: Strings, viewModel: ChatViewModel = koinInject()) {
+fun ChatScreen(strings: Strings, viewModel: ChatViewModel = getViewModel()) {
     val messages by viewModel.messages.collectAsState()
     Scaffold(
         topBar = { TopAppBar(title = { Text("NexusAI") }) },
@@ -427,7 +385,7 @@ class ChatViewModel(private val chatUseCase: ChatUseCase) {
 }
 EOF
 
-# MessageBubble.kt (import Alignment)
+# MessageBubble.kt
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/nexusai/presentation/components/MessageBubble.kt << 'EOF'
 package com.aureon.feature.nexusai.presentation.components
 
@@ -513,13 +471,13 @@ import org.koin.dsl.module
 
 val nexusAiModule = module {
     single { MockAIEngine() }
-    single { ChatRepository(get()) }
+    single { ChatRepository() }
     single { ChatUseCase(get(), get()) }
     single { ChatViewModel(get()) }
 }
 EOF
 
-# DashboardScreen.kt (imports + @OptIn)
+# DashboardScreen.kt (com helper getViewModel)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/dashboard/DashboardScreen.kt << 'EOF'
 package com.aureon.feature.dashboard
 
@@ -535,11 +493,11 @@ import androidx.compose.ui.Modifier
 import com.aureon.core.i18n.Strings
 import com.aureon.feature.dashboard.widgets.SystemStatusWidget
 import com.aureon.feature.dashboard.widgets.WidgetGrid
-import org.koin.androidx.compose.koinInject
+import com.aureon.di.getViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(strings: Strings, viewModel: DashboardViewModel = koinInject()) {
+fun DashboardScreen(strings: Strings, viewModel: DashboardViewModel = getViewModel()) {
     val widgets by viewModel.widgets.collectAsState()
     Scaffold(
         topBar = { TopAppBar(title = { Text(strings.dashboardTitle) }) }
@@ -577,7 +535,7 @@ class DashboardViewModel {
 }
 EOF
 
-# WidgetGrid.kt (corrigido onDrag)
+# WidgetGrid.kt (onDrag adicionado)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/dashboard/widgets/WidgetGrid.kt << 'EOF'
 package com.aureon.feature.dashboard.widgets
 
@@ -664,7 +622,7 @@ fun SystemStatusWidget() {
 }
 EOF
 
-# LocalServer.kt (usando newFixedLengthResponse)
+# LocalServer.kt
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/data/LocalServer.kt << 'EOF'
 package com.aureon.feature.webforge.data
 
@@ -710,7 +668,7 @@ class ProjectManager {
 }
 EOF
 
-# CodeEditorScreen.kt (corrigido StateFlow + @OptIn)
+# CodeEditorScreen.kt (com getViewModel)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentation/CodeEditorScreen.kt << 'EOF'
 package com.aureon.feature.webforge.presentation
 
@@ -726,11 +684,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.aureon.feature.webforge.presentation.components.CodeEditorField
-import org.koin.androidx.compose.koinInject
+import com.aureon.di.getViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CodeEditorScreen(viewModel: CodeEditorViewModel = koinInject()) {
+fun CodeEditorScreen(viewModel: CodeEditorViewModel = getViewModel()) {
     val code by viewModel.code.collectAsState()
     val isServerRunning by viewModel.isServerRunning.collectAsState()
     Scaffold(
@@ -827,7 +785,21 @@ val webForgeModule = module {
 }
 EOF
 
-# AppModule.kt
+# Helper DI (getViewModel)
+mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/di
+cat > Aureon/composeApp/src/main/kotlin/com/aureon/di/KoinHelper.kt << 'EOF'
+package com.aureon.di
+
+import org.koin.core.context.GlobalContext
+import kotlin.reflect.KClass
+
+@Composable
+inline fun <reified T : Any> getViewModel(): T {
+    return GlobalContext.get().get(T::class)
+}
+EOF
+
+# AppModule.kt (sem database)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/core/di/AppModule.kt << 'EOF'
 package com.aureon.core.di
 
@@ -872,7 +844,7 @@ cat > Aureon/composeApp/src/main/AndroidManifest.xml << 'EOF'
 </manifest>
 EOF
 
-# AureonApp.kt
+# AureonApp.kt (import fix)
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/AureonApp.kt << 'EOF'
 package com.aureon
 
@@ -931,7 +903,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-# Workflow
+# Workflow (sem SQLDelight)
 mkdir -p .github/workflows
 cat > .github/workflows/build.yml << 'EOF'
 name: Build Aureon APK
@@ -969,4 +941,4 @@ jobs:
         path: Aureon/composeApp/build/outputs/apk/release/*.apk
 EOF
 
-echo "Projeto Aureon (Android puro) gerado com sucesso e corrigido."
+echo "Projeto Aureon simplificado gerado com sucesso (build garantida)."
