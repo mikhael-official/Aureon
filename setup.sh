@@ -17,19 +17,17 @@ mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/presentat
 mkdir -p Aureon/composeApp/src/main/kotlin/com/aureon/feature/webforge/di
 mkdir -p Aureon/composeApp/src/main/res/values
 
-# build.gradle.kts raiz
+# Root build.gradle.kts – SEM org.jetbrains.compose
 cat > Aureon/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application") version "8.2.2" apply false
     id("org.jetbrains.kotlin.android") version "2.0.0" apply false
-    id("org.jetbrains.compose") version "1.6.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" apply false
     id("app.cash.sqldelight") version "2.0.1" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0" apply false
 }
 EOF
 
-# settings.gradle.kts
 cat > Aureon/settings.gradle.kts << 'EOF'
 pluginManagement {
     repositories {
@@ -48,7 +46,6 @@ rootProject.name = "Aureon"
 include(":composeApp")
 EOF
 
-# gradle.properties
 cat > Aureon/gradle.properties << 'EOF'
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
@@ -56,13 +53,12 @@ kotlin.code.style=official
 android.nonTransitiveRClass=true
 EOF
 
-# composeApp/build.gradle.kts (APENAS ANDROID – SEM KMP)
+# composeApp/build.gradle.kts – APENAS ANDROID, SEM KMP, SEM ORG.JETBRAINS.COMPOSE
 cat > Aureon/composeApp/build.gradle.kts << 'EOF'
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.compose")   // compose compiler plugin, não carrega KMP
     id("app.cash.sqldelight")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -94,10 +90,10 @@ android {
 }
 
 dependencies {
-    implementation(platform("org.jetbrains.compose:compose-bom:1.6.0"))
-    implementation("org.jetbrains.compose.ui:ui")
-    implementation("org.jetbrains.compose.foundation:foundation")
-    implementation("org.jetbrains.compose.material3:material3")
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("io.ktor:ktor-client-core:2.3.7")
     implementation("io.ktor:ktor-client-okhttp:2.3.7")
@@ -121,6 +117,9 @@ sqldelight {
     }
 }
 EOF
+
+# ... (todos os demais arquivos Kotlin permanecem exatamente iguais aos do script anterior)
+# Apenas copie o restante do script que gera os fontes (já fornecidos nas respostas anteriores).
 
 # App.kt
 cat > Aureon/composeApp/src/main/kotlin/com/aureon/App.kt << 'EOF'
@@ -870,7 +869,7 @@ zipStoreBase=GRADLE_USER_HOME
 zipStorePath=wrapper/dists
 EOF
 
-# Geração do workflow no local correto
+# Workflow atualizado
 mkdir -p .github/workflows
 cat > .github/workflows/build.yml << 'EOF'
 name: Build Aureon APK
@@ -884,29 +883,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
     - name: Generate project files
       run: chmod +x setup.sh && ./setup.sh
-
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: 17
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: 8.4
-
     - name: Build APK
       run: |
         cd Aureon
         gradle :composeApp:assembleRelease
-
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
@@ -914,4 +907,4 @@ jobs:
         path: Aureon/composeApp/build/outputs/apk/release/*.apk
 EOF
 
-echo "Projeto Aureon (Android puro) gerado com sucesso. Workflow atualizado."
+echo "Projeto Aureon (Android puro, sem KMP) gerado com sucesso."
